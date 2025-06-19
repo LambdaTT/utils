@@ -12,6 +12,12 @@ Install via Composer:
 composer require lambdatt-php/utils
 ```
 
+Run the Migrations:
+```bash
+php console migrations:apply --module=utils
+```
+**PS: this can only be installed on a SplitPHP Framework project. For more information refer to: https://github.com/splitphp/core**
+
 ## Included Utilities
 
 - General purpose procedures
