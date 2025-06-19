@@ -1,0 +1,18 @@
+{
+  "name": "lambdatt-php/utils",
+  "description": "A SplitPHP Framework plugin which provides helpers and general utilities out of the box.",
+  "type": "splitphp-module",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "SplitPHP\\": "./"
+    }
+  },
+  "authors": [
+    {
+      "name": "Gabriel Valentoni Guelfi",
+      "email": "gabriel.valguelfi@gmail.com"
+    }
+  ],
+  "require": {}
+}
