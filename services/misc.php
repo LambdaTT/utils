@@ -1,9 +1,9 @@
 <?php
 
-namespace application\services\utils;
+namespace Utils\Services;
 
-use \engine\Service;
-use \Exception;
+use SplitPHP\Service;
+use Exception;
 
 class Misc extends Service
 {

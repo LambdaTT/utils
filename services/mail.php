@@ -1,9 +1,9 @@
 <?php
 
-namespace application\services\utils;
+namespace Utils\Services;
 
-use \engine\Service;
-use \PHPMailer\PHPMailer\PHPMailer;
+use SplitPHP\Service;
+use PHPMailer\PHPMailer\PHPMailer;
 
 class Mail extends Service
 {
