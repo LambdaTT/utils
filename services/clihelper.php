@@ -370,7 +370,7 @@ class CliHelper extends Service
             throw new \InvalidArgumentException("Invalid callback validator for field '{$key}'");
           }
 
-          if (! call_user_func($fn, $input)) {
+          if (! call_user_func_array($fn, [$input, $results])) {
             $error = $message ?? "{$label} failed validation.";
           }
         }
