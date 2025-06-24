@@ -112,79 +112,140 @@ class CliHelper extends Service
    */
   public function table(iterable $items, ?array $columns = null): void
   {
+    // 1) normalize rows
     $rows = [];
     foreach ($items as $item) {
-      if (is_object($item)) {
-        $rows[] = (array) $item;
-      } elseif (is_array($item)) {
-        $rows[] = $item;
-      }
+      $rows[] = is_object($item) ? (array)$item : $item;
     }
-
     if (empty($rows)) {
       echo "(empty)\n";
       return;
     }
 
+    // 2) columns & headers
     if ($columns === null) {
       $columns = array_combine(
         array_keys($rows[0]),
         array_keys($rows[0])
       );
     }
-
     $keys    = array_keys($columns);
     $headers = array_values($columns);
+    $colCount = count($keys);
 
-    // Compute display widths using mb_strwidth
-    $widths = [];
+    // 3) natural max widths per column
+    $natural = [];
     foreach ($keys as $i => $key) {
-      $widths[$key] = mb_strwidth((string)$headers[$i], 'UTF-8');
+      $natural[$key] = mb_strwidth($headers[$i], 'UTF-8');
     }
     foreach ($rows as $row) {
       foreach ($keys as $key) {
-        $val = isset($row[$key]) ? (string)$row[$key] : '';
-        $w   = mb_strwidth($val, 'UTF-8');
-        if ($w > $widths[$key]) {
-          $widths[$key] = $w;
+        $w = mb_strwidth((string)($row[$key] ?? ''), 'UTF-8');
+        if ($w > $natural[$key]) {
+          $natural[$key] = $w;
         }
       }
     }
 
-    // Helper to pad multibyte strings
-    $mbPad = function (string $input, int $length): string {
-      // str_pad counts bytes, so adjust for multibyte
-      $diff = strlen($input) - mb_strlen($input, 'UTF-8');
-      return str_pad($input, $length + $diff);
+    // 4) get terminal width (fallback to 80)
+    $termWidth = (int) @shell_exec('tput cols') ?: 80;
+
+    // 5) compute available for content:
+    // table total width = sum(widths) + 3*colCount + 1
+    // so availableContent = termWidth - (3*colCount + 1)
+    $available = $termWidth - (3 * $colCount + 1);
+    if ($available < $colCount) {
+      $available = array_sum($natural);
+    }
+
+    // 6) distribute budget across columns (small-to-large “water-filling”)
+    $final = [];
+    $remainCols = $colCount;
+    $remainBudget = $available;
+    // sort keys by natural width ascending
+    $sorted = $keys;
+    usort($sorted, function ($a, $b) use ($natural) {
+      return $natural[$a] <=> $natural[$b];
+    });
+    foreach ($sorted as $key) {
+      $fair = (int) floor($remainBudget / $remainCols);
+      if ($natural[$key] <= $fair) {
+        $final[$key] = $natural[$key];
+      } else {
+        $final[$key] = $fair;
+      }
+      $remainBudget -= $final[$key];
+      $remainCols--;
+    }
+
+    // 7) padding helper
+    $mbPad = function (string $s, int $len) {
+      $diff = strlen($s) - mb_strlen($s, 'UTF-8');
+      return str_pad($s, $len + $diff);
     };
 
-    // Separator line
+    // 8) word-wrap helper
+    $wrap = function (string $text, int $max) {
+      $words = preg_split('/(\s+)/u', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+      $lines = [''];
+      foreach ($words as $w) {
+        $cw = mb_strwidth($w, 'UTF-8');
+        $lw = mb_strwidth($lines[count($lines) - 1], 'UTF-8');
+        if ($lw + $cw <= $max) {
+          $lines[count($lines) - 1] .= $w;
+        } else {
+          if ($cw > $max) {
+            // break the long chunk
+            $s = $w;
+            while (mb_strwidth($s, 'UTF-8') > $max) {
+              $part = '';
+              for ($i = 0; $i < mb_strlen($s, 'UTF-8'); $i++) {
+                $c = mb_substr($s, $i, 1, 'UTF-8');
+                if (mb_strwidth($part . $c, 'UTF-8') > $max) break;
+                $part .= $c;
+              }
+              $lines[] = $part;
+              $s = mb_substr($s, mb_strlen($part, 'UTF-8'), null, 'UTF-8');
+            }
+            $lines[] = $s;
+          } else {
+            $lines[] = ltrim($w);
+          }
+        }
+      }
+      return $lines;
+    };
+
+    // 9) build separator
     $sep = '+';
     foreach ($keys as $key) {
-      $sep .= str_repeat('-', $widths[$key] + 2) . '+';
+      $sep .= str_repeat('-', $final[$key] + 2) . '+';
     }
 
-    echo $sep . "\n";
-
-    // Header row
-    $line = '|';
+    // 10) print header
+    echo $sep . "\n|";
     foreach ($keys as $i => $key) {
-      $line .= ' ' . $mbPad($headers[$i], $widths[$key]) . ' |';
+      echo ' ' . $mbPad($headers[$i], $final[$key]) . ' |';
     }
-    echo $line . "\n";
-    echo $sep . "\n";
+    echo "\n" . $sep . "\n";
 
-    // Data rows
+    // 11) print rows
     foreach ($rows as $row) {
-      $line = '|';
+      $wrappedCols = [];
       foreach ($keys as $key) {
-        $val = isset($row[$key]) ? (string)$row[$key] : '';
-        $line .= ' ' . $mbPad($val, $widths[$key]) . ' |';
+        $wrappedCols[$key] = $wrap((string)($row[$key] ?? ''), $final[$key]);
       }
-      echo $line . "\n";
+      $lines = max(array_map('count', $wrappedCols));
+      for ($i = 0; $i < $lines; $i++) {
+        echo '|';
+        foreach ($keys as $key) {
+          $part = $wrappedCols[$key][$i] ?? '';
+          echo ' ' . $mbPad($part, $final[$key]) . ' |';
+        }
+        echo "\n";
+      }
+      echo $sep . "\n";
     }
-
-    echo $sep . "\n";
   }
 
   /**
