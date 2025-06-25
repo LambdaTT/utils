@@ -3,6 +3,7 @@
 namespace Utils\Services;
 
 use SplitPHP\Service;
+use SplitPHP\Utils;
 use Exception;
 
 class Misc extends Service
@@ -403,5 +404,123 @@ class Misc extends Service
     }
     $address .= ', ' . $addressObj->ds_addressneighborhood . ', ' . $addressObj->ds_addresscity . ' - ' . $addressObj->do_addressuf;
     return $address;
+  }
+
+  public function printDataTable(string $cmdTitle, callable $getRows, array $columns, array &$params)
+  {
+    $sortBy  = $params['$sort_by']         ?? null;
+    $sortDir = $params['$sort_direction']  ?? 'ASC';
+
+    // --- <== HERE: open STDIN in BLOCKING mode (no stream_set_blocking) ===>
+    $stdin = fopen('php://stdin', 'r');
+    // on *nix, disable line buffering & echo
+    if (DIRECTORY_SEPARATOR !== '\\') {
+      system('stty -icanon -echo');
+    }
+
+    $exit = false;
+    while (! $exit) {
+      // Clear screen + move cursor home
+      if (DIRECTORY_SEPARATOR === '\\') {
+        system('cls');
+      } else {
+        echo "\033[2J\033[H";
+      }
+
+      // Header & hints
+      Utils::printLn($this->getService('utils/clihelper')->ansi("Welcome to the {$cmdTitle}!\n", 'color: cyan; font-weight: bold'));
+      Utils::printLn("HINTS:");
+      Utils::printLn("  • --limit={$params['$limit']}   (items/page)");
+      Utils::printLn("  • --sort-by={$sortBy}   --sort-direction={$sortDir}");
+      if (DIRECTORY_SEPARATOR === '\\') {
+        Utils::printLn("  • Press 'n' = next page, 'p' = previous page, 'q' = quit");
+      } else {
+        Utils::printLn("  • ←/→ arrows to navigate pages, 'q' to quit");
+      }
+      Utils::printLn("  • Press 'ctrl+c' to exit at any time");
+      Utils::printLn();
+
+      $rows = [];
+      try {
+        $rows = $getRows();
+      } catch (Exception $e) {
+        // Restore terminal settings on *nix
+        if (DIRECTORY_SEPARATOR !== '\\') {
+          system('stty sane');
+        }
+
+        throw $e;
+      }
+
+      // Fetch & render
+      if (empty($rows)) {
+        Utils::printLn("  >> No items found on page {$params['$page']}.");
+      } else {
+        Utils::printLn(" Page {$params['$page']} — showing " . count($rows) . " items");
+        Utils::printLn(str_repeat('─', 60));
+        $this->getService('utils/clihelper')->table($rows, $columns);
+      }
+
+      // --- <== HERE: wait for exactly one keypress, blocking until you press ===>
+      $c = fgetc($stdin);
+      if (DIRECTORY_SEPARATOR === '\\') {
+        $input = strtolower($c);
+      } else {
+        if ($c === "\033") {             // arrow keys start with ESC
+          $input = $c . fgetc($stdin) . fgetc($stdin);
+        } else {
+          $input = $c;
+        }
+      }
+
+      // Handle navigation
+      if (DIRECTORY_SEPARATOR === '\\') {
+        switch ($input) {
+          case 'n':
+            $params['$page']++;
+            break;
+          case 'p':
+            $params['$page'] = max(1, $params['$page'] - 1);
+            break;
+          case 'q':
+            $exit = true;
+            break;
+        }
+      } else {
+        switch ($input) {
+          case "\033[C": // →
+            $params['$page']++;
+            break;
+          case "\033[D": // ←
+            $params['$page'] = max(1, $params['$page'] - 1);
+            break;
+          case 'q':
+            $exit = true;
+            break;
+        }
+      }
+    }
+
+    // Restore terminal settings on *nix
+    if (DIRECTORY_SEPARATOR !== '\\') {
+      system('stty sane');
+    }
+
+    // Cleanup
+    fclose($stdin);
+  }
+
+  public function persistentCliInput(callable $rule, string $msg = 'Please enter a value')
+  {
+    $input = null;
+    $stdin = fopen('php://stdin', 'r');
+    while (true) {
+      $input = trim(fgets($stdin));
+      if ($rule($input)) break;
+
+      Utils::printLn("  >> {$msg}: ");
+    }
+    fclose($stdin);
+    return $input;
   }
 }
