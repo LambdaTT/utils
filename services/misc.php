@@ -406,8 +406,26 @@ class Misc extends Service
     return $address;
   }
 
-  public function printDataTable(string $cmdTitle, callable $getRows, array $columns, array &$params)
+  public function printDataTable(string $cmdTitle, callable $getRows, array $columns, array $args)
   {
+    // Extract and normalize our options
+    $limit   = isset($args['--limit']) ? (int)$args['--limit'] : 10;
+    $sortBy  = $args['--sort-by']         ?? null;
+    $sortDir = $args['--sort-direction']  ?? 'ASC';
+    $page = isset($args['--page']) ? (int)$args['--page'] : 1;
+    unset($args['--limit'], $args['--sort-by'], $args['--sort-direction'], $args['--page']);
+
+    $params = array_merge($args, [
+      '$limit' => $limit,
+      '$limit_multiplier' => 1, // No multiplier for pagination
+      '$page'  => $page,
+    ]);
+
+    if ($sortBy) {
+      $params['$sort_by']        = $sortBy;
+      $params['$sort_direction'] = $sortDir;
+    }
+
     $sortBy  = $params['$sort_by']         ?? null;
     $sortDir = $params['$sort_direction']  ?? 'ASC';
 
@@ -419,7 +437,7 @@ class Misc extends Service
     }
 
     $exit = false;
-    while (! $exit) {
+    while (!$exit) {
       // Clear screen + move cursor home
       if (DIRECTORY_SEPARATOR === '\\') {
         system('cls');
@@ -430,7 +448,7 @@ class Misc extends Service
       // Header & hints
       Utils::printLn($this->getService('utils/clihelper')->ansi("Welcome to the {$cmdTitle}!\n", 'color: cyan; font-weight: bold'));
       Utils::printLn("HINTS:");
-      Utils::printLn("  • --limit={$params['$limit']}   (items/page)");
+      Utils::printLn("  • --limit={$limit}   (items/page)");
       Utils::printLn("  • --sort-by={$sortBy}   --sort-direction={$sortDir}");
       if (DIRECTORY_SEPARATOR === '\\') {
         Utils::printLn("  • Press 'n' = next page, 'p' = previous page, 'q' = quit");
@@ -442,7 +460,7 @@ class Misc extends Service
 
       $rows = [];
       try {
-        $rows = $getRows();
+        $rows = $getRows($params);
       } catch (Exception $e) {
         // Restore terminal settings on *nix
         if (DIRECTORY_SEPARATOR !== '\\') {
@@ -454,9 +472,9 @@ class Misc extends Service
 
       // Fetch & render
       if (empty($rows)) {
-        Utils::printLn("  >> No items found on page {$params['$page']}.");
+        Utils::printLn("  >> No items found on page {$page}.");
       } else {
-        Utils::printLn(" Page {$params['$page']} — showing " . count($rows) . " items");
+        Utils::printLn(" Page {$page} — showing " . count($rows) . " items");
         Utils::printLn(str_repeat('─', 60));
         $this->getService('utils/clihelper')->table($rows, $columns);
       }
@@ -477,10 +495,10 @@ class Misc extends Service
       if (DIRECTORY_SEPARATOR === '\\') {
         switch ($input) {
           case 'n':
-            $params['$page']++;
+            $page++;
             break;
           case 'p':
-            $params['$page'] = max(1, $params['$page'] - 1);
+            $page = max(1, $page - 1);
             break;
           case 'q':
             $exit = true;
@@ -489,10 +507,10 @@ class Misc extends Service
       } else {
         switch ($input) {
           case "\033[C": // →
-            $params['$page']++;
+            $page++;
             break;
           case "\033[D": // ←
-            $params['$page'] = max(1, $params['$page'] - 1);
+            $page = max(1, $page - 1);
             break;
           case 'q':
             $exit = true;
