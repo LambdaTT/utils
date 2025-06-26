@@ -412,13 +412,12 @@ class Misc extends Service
     $limit   = isset($args['--limit']) ? (int)$args['--limit'] : 10;
     $sortBy  = $args['--sort-by']         ?? null;
     $sortDir = $args['--sort-direction']  ?? 'ASC';
-    $page = isset($args['--page']) ? (int)$args['--page'] : 1;
     unset($args['--limit'], $args['--sort-by'], $args['--sort-direction'], $args['--page']);
 
     $params = array_merge($args, [
       '$limit' => $limit,
       '$limit_multiplier' => 1, // No multiplier for pagination
-      '$page'  => $page,
+      '$page'  => isset($args['--page']) ? (int)$args['--page'] : 1,
     ]);
 
     if ($sortBy) {
@@ -472,9 +471,9 @@ class Misc extends Service
 
       // Fetch & render
       if (empty($rows)) {
-        Utils::printLn("  >> No items found on page {$page}.");
+        Utils::printLn("  >> No items found on page {$params['$page']}.");
       } else {
-        Utils::printLn(" Page {$page} — showing " . count($rows) . " items");
+        Utils::printLn(" Page {$params['$page']} — showing " . count($rows) . " items");
         Utils::printLn(str_repeat('─', 60));
         $this->getService('utils/clihelper')->table($rows, $columns);
       }
@@ -495,10 +494,10 @@ class Misc extends Service
       if (DIRECTORY_SEPARATOR === '\\') {
         switch ($input) {
           case 'n':
-            $page++;
+            $params['$page']++;
             break;
           case 'p':
-            $page = max(1, $page - 1);
+            $params['$page'] = max(1, $params['$page'] - 1);
             break;
           case 'q':
             $exit = true;
@@ -507,10 +506,10 @@ class Misc extends Service
       } else {
         switch ($input) {
           case "\033[C": // →
-            $page++;
+            $params['$page']++;
             break;
           case "\033[D": // ←
-            $page = max(1, $page - 1);
+            $params['$page'] = max(1, $params['$page'] - 1);
             break;
           case 'q':
             $exit = true;
