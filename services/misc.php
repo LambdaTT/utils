@@ -540,4 +540,20 @@ class Misc extends Service
     fclose($stdin);
     return $input;
   }
+
+  public function waitFor(callable $callback, $timeout = null)
+  {
+    $startTime = time();
+    while (true) {
+      // Call the callback function
+      if ($callback()) break;
+
+      // Check if the timeout has been reached
+      if ($timeout !== null && (time() - $startTime >= $timeout))
+        break; // Timeout reached, return null
+
+      // Sleep for a short duration to avoid busy waiting
+      usleep(100000); // Sleep for 100 milliseconds
+    }
+  }
 }
