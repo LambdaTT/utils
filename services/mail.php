@@ -7,7 +7,7 @@ use PHPMailer\PHPMailer\PHPMailer;
 
 class Mail extends Service
 {
-  public function init()
+  public function init(): void
   {
     $this->setConfigs();
     require ROOT_PATH . '/vendors/phpmailer/src/Exception.php';
