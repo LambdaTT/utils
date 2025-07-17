@@ -7,12 +7,12 @@ use PHPMailer\PHPMailer\PHPMailer;
 
 class Mail extends Service
 {
-  public function init(): void
+  public function __construct()
   {
     $this->setConfigs();
-    require ROOT_PATH . '/vendors/phpmailer/src/Exception.php';
-    require ROOT_PATH . '/vendors/phpmailer/src/PHPMailer.php';
-    require ROOT_PATH . '/vendors/phpmailer/src/SMTP.php';
+    require dirname(__DIR__) . '/vendor/phpmailer/src/Exception.php';
+    require dirname(__DIR__) . '/vendor/phpmailer/src/PHPMailer.php';
+    require dirname(__DIR__) . '/vendor/phpmailer/src/SMTP.php';
   }
 
   public function send($msg, $recipientAddress, $subject, $isHTML = true)
@@ -56,16 +56,22 @@ class Mail extends Service
   {
     if (!defined('SMTP_HOST'))
       define('SMTP_HOST', getenv('SMTP_HOST'));
+
     if (!defined('SMTP_PORT'))
       define('SMTP_PORT', getenv('SMTP_PORT'));
+
     if (!defined('REQUIRE_TLS'))
       define('REQUIRE_TLS', getenv('REQUIRE_TLS') == 'on');
+
     if (!defined('SMTP_USER'))
       define('SMTP_USER', getenv('SMTP_USER'));
+
     if (!defined('SMTP_PASS'))
       define('SMTP_PASS', getenv('SMTP_PASS'));
+
     if (!defined('SENDER_EMAIL'))
       define('SENDER_EMAIL', getenv('SENDER_EMAIL'));
+
     if (!defined('SENDER_NAME'))
       define('SENDER_NAME', getenv('SENDER_NAME'));
   }

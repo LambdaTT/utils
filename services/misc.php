@@ -166,7 +166,7 @@ class Misc extends Service
    */
   public function stringToSlug(String $string)
   {
-    $string = preg_replace('/[^\w\s]/u', '', $string);
+    $string = preg_replace('/[^\w\s\.]/u', '', $string);
     $string = iconv('UTF-8', 'ASCII//TRANSLIT', $string);
     $string = str_replace(' ', '-', $string);
     $string = strtolower($string);
