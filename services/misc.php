@@ -556,4 +556,114 @@ class Misc extends Service
       usleep(100000); // Sleep for 100 milliseconds
     }
   }
+
+  public function makeSmartTag(string $title, int $max = 5): string
+  {
+    // 1) normalize
+    $s = mb_strtolower($title, 'UTF-8');
+    $s = iconv('UTF-8', 'ASCII//TRANSLIT', $s);        // café -> cafe
+    $s = preg_replace('/[^a-z0-9]+/i', ' ', $s);       // keep only letters/digits as words
+    $words = array_values(array_filter(explode(' ', trim($s))));
+
+    // Common EN/PT stopwords (short list; tweak as needed)
+    $stop = [
+      'a',
+      'an',
+      'the',
+      'and',
+      'or',
+      'of',
+      'for',
+      'to',
+      'in',
+      'on',
+      'at',
+      'by',
+      'with',
+      'from',
+      'de',
+      'da',
+      'do',
+      'das',
+      'dos',
+      'e',
+      'ou',
+      'para',
+      'por',
+      'em',
+      'no',
+      'na',
+      'nos',
+      'nas',
+      'com'
+    ];
+
+    // 2) keep significant words (>=2 chars OR numeric tokens)
+    $sig = [];
+    foreach ($words as $w) {
+      if (ctype_digit($w) || (strlen($w) >= 2 && !in_array($w, $stop, true))) {
+        $sig[] = $w;
+      }
+    }
+    if (empty($sig)) $sig = $words; // fallback to any words if all were stopwords
+
+    // helpers
+    $vowels = ['a', 'e', 'i', 'o', 'u'];
+    $hasVowel = function (string $str) use ($vowels): bool {
+      foreach ($vowels as $v) if (strpos($str, $v) !== false) return true;
+      return false;
+    };
+
+    // 3) build tag: start with initials of significant words
+    $tag = '';
+    foreach ($sig as $w) {
+      if (strlen($tag) >= $max) break;
+      $tag .= $w[0];
+    }
+
+    // 4) complete with next letters of the first significant words (legibility > randomness)
+    if (strlen($tag) < $max) {
+      foreach ($sig as $w) {
+        for ($i = 1; $i < strlen($w) && strlen($tag) < $max; $i++) {
+          $tag .= $w[$i];
+        }
+        if (strlen($tag) >= $max) break;
+      }
+    }
+
+    // 5) still short? append digits from any numeric tokens
+    if (strlen($tag) < $max) {
+      foreach ($sig as $w) {
+        if (ctype_digit($w)) {
+          for ($i = 0; $i < strlen($w) && strlen($tag) < $max; $i++) {
+            $tag .= $w[$i];
+          }
+        }
+        if (strlen($tag) >= $max) break;
+      }
+    }
+
+    // 6) ensure at least one vowel if possible (readability)
+    if (!empty($sig) && !$hasVowel($tag)) {
+      foreach ($sig as $w) {
+        for ($i = 0; $i < strlen($w); $i++) {
+          if (in_array($w[$i], $vowels, true)) {
+            // insert vowel at end (or replace last char if already at max)
+            if (strlen($tag) < $max) $tag .= $w[$i];
+            else $tag = substr($tag, 0, $max - 1) . $w[$i];
+            break 2;
+          }
+        }
+      }
+    }
+
+    // 7) final cleanup & fallback
+    $tag = preg_replace('/[^a-z0-9]/', '', $tag);
+    if ($tag === '') {
+      // deterministic fallback: base36 of crc32
+      $tag = substr(base_convert(sprintf('%u', crc32($title)), 10, 36), 0, $max);
+    }
+
+    return substr($tag, 0, $max);
+  }
 }
