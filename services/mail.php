@@ -4,9 +4,13 @@ namespace Utils\Services;
 
 use SplitPHP\Service;
 use PHPMailer\PHPMailer\PHPMailer;
+use SplitPHP\Helpers;
 
 class Mail extends Service
 {
+  private $senderEmail;
+  private $senderName;
+
   public function __construct()
   {
     $this->setConfigs();
@@ -15,15 +19,22 @@ class Mail extends Service
     require dirname(__DIR__) . '/vendor/phpmailer/src/SMTP.php';
   }
 
+  public function setSender($name, $email)
+  {
+    $this->senderName = $name;
+    $this->senderEmail = $email;
+    return $this;
+  }
+
   public function send($msg, $recipientAddress, $subject, $isHTML = true)
   {
     $host     = SMTP_HOST;
     $port     = SMTP_PORT;
     $username = SMTP_USER;
     $password = SMTP_PASS;
-    $from     = SENDER_EMAIL;
+    $from     = $this->senderEmail ?? SENDER_EMAIL;
     $tls      = REQUIRE_TLS;
-    $from_name = SENDER_NAME;
+    $from_name = $this->senderName ?? SENDER_NAME;
 
     $mailer = new PHPMailer(true);
     $mailer->IsSMTP();
@@ -45,11 +56,17 @@ class Mail extends Service
     $mailer->Body       = $msg;
     $mailer->IsHTML($isHTML);
 
-    if (!$mailer->Send()) {
-      return false;
-    } else {
-      return true;
-    }
+    $logInfo = [
+      'datetime' => date('Y-m-d H:i:s'),
+      'from' => $from,
+      'fromName' => $from_name,
+      'to' => $recipientAddress,
+      'subject' => $subject,
+      'body' => $msg
+    ];
+    Helpers::Log()->common('email', $logInfo);
+
+    return $mailer->Send(); 
   }
 
   private function setConfigs()
