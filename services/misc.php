@@ -543,8 +543,17 @@ class Misc extends Service
 
   public function waitFor(callable $callback, $timeout = null)
   {
+    // Release the PHP session lock so other requests from the same client
+    // are not serialized while this blocking loop is running.
+    if (session_status() === PHP_SESSION_ACTIVE) {
+      session_write_close();
+    }
+
     $startTime = time();
     while (true) {
+      // Stop if the client has disconnected (e.g. navigated away from the page)
+      if (connection_aborted()) break;
+
       // Call the callback function
       if ($callback()) break;
 
